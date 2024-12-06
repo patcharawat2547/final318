@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เกมพี่โหน่ง</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            background: linear-gradient(135deg, #090505 0%, #efcee7 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+
+        .container {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 3rem;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            width: 400px;
+            color: white;
+        }
+
+        input, select, button {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: none;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        button {
+            background: linear-gradient(145deg, #ff7e5f, #feb47b);
+            color: white;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+        }
+
+        .progress-bar-container {
+            background: #555;
+            border-radius: 10px;
+            overflow: hidden;
+            height: 20px;
+            margin: 10px 0;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: #76c7c0;
+            width: 100%;
+        }
+
+        ul#guess-history {
+            list-style: none;
+            padding: 0;
+        }
+
+        ul#guess-history li {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 6px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 20px;
+            color: white;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            opacity: 0;
+            z-index: 9999;
+            transition: all 0.5s ease;
+        }
+
+        .toast.success {
+            background-color: #28a745;
+        }
+
+        .toast.error {
+            background-color: #dc3545;
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="login-container" class="container">
+    <h2>เข้าสู่ระบบ</h2>
+    <input type="text" id="username" placeholder="ชื่อผู้ใช้">
+    <input type="password" id="password" placeholder="รหัสผ่าน">
+    <button onclick="login()">เข้าสู่ระบบ</button>
+    <p>ยังไม่มีบัญชี? <a href="#" onclick="showRegister()">สมัครเลย</a></p>
+</div>
+
+<div id="register-container" class="container hidden">
+    <h2>ลงทะเบียน</h2>
+    <input type="text" id="reg-username" placeholder="ชื่อผู้ใช้">
+    <input type="password" id="reg-password" placeholder="รหัสผ่าน">
+    <input type="password" id="reg-confirm-password" placeholder="ยืนยันรหัสผ่าน">
+    <button onclick="register()">ลงทะเบียน</button>
+    <p>มีบัญชีแล้ว? <a href="#" onclick="showLogin()">ล็อกอิน</a></p>
+</div>
+
+<div id="game-container" class="container hidden">
+    <h2>เกมทายตัวเลข</h2>
+    <p id="player-name"></p>
+    <label for="difficulty">เลือกระดับความยาก:</label>
+    <select id="difficulty" onchange="setDifficulty()">
+        <option value="easy">ง่าย (1-50)</option>
+        <option value="medium" selected>ปานกลาง (1-100)</option>
+        <option value="hard">ยาก (1-200)</option>
+    </select>
+    <p>คุณมีโอกาสเหลือ <span id="attempts-left">10</span> ครั้ง</p>
+    <div class="progress-bar-container">
+        <div class="progress-bar" id="progress-bar"></div>
+    </div>
+    <input type="number" id="guess-input" placeholder="กรอกตัวเลข">
+    <button onclick="submitGuess()">ทาย</button>
+    <ul id="guess-history"></ul>
+    <button id="reset-button" onclick="resetGame()" class="hidden">เล่นใหม่</button>
+    <button onclick="logout()">ออกจากระบบ</button>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+    let users = JSON.parse(localStorage.getItem('users')) || {};
+    let currentUser = '';
+    let randomNumber = 0;
+    let attemptsLeft = 10;
+    let guessHistory = [];
+    let maxRange = 100;
+
+    function showToast(message, type) {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = `toast ${type} show`;
+        setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    function setDifficulty() {
+        const difficulty = document.getElementById('difficulty').value;
+        if (difficulty === 'easy') {
+            maxRange = 50;
+            attemptsLeft = 5;
+        } else if (difficulty === 'medium') {
+            maxRange = 100;
+            attemptsLeft = 10;
+        } else if (difficulty === 'hard') {
+            maxRange = 200;
+            attemptsLeft = 15;
+        }
+        resetGame();
+    }
+
+    function showRegister() {
+        document.getElementById('login-container').classList.add('hidden');
+        document.getElementById('register-container').classList.remove('hidden');
+    }
+
+    function showLogin() {
+        document.getElementById('register-container').classList.add('hidden');
+        document.getElementById('login-container').classList.remove('hidden');
+    }
+
+    function login() {
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value.trim();
+        if (!users[username] || users[username] !== password) {
+            showToast('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง', 'error');
+        } else {
+            currentUser = username;
+            document.getElementById('login-container').classList.add('hidden');
+            document.getElementById('game-container').classList.remove('hidden');
+            document.getElementById('player-name').textContent = `ยินดีต้อนรับ ${username}`;
+            showToast('เข้าสู่ระบบสำเร็จ!', 'success');
+            resetGame();
+        }
+    }
+
+    function register() {
+        const username = document.getElementById('reg-username').value.trim();
+        const password = document.getElementById('reg-password').value.trim();
+        const confirmPassword = document.getElementById('reg-confirm-password').value.trim();
+
+        if (!username || !password || !confirmPassword) {
+            showToast('กรุณากรอกข้อมูลให้ครบถ้วน', 'error');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            showToast('รหัสผ่านไม่ตรงกัน', 'error');
+        } else if (users[username]) {
+            showToast('ชื่อผู้ใช้นี้มีอยู่ในระบบแล้ว', 'error');
+        } else {
+            users[username] = password;
+            localStorage.setItem('users', JSON.stringify(users));
+            showToast('ลงทะเบียนสำเร็จ', 'success');
+            showLogin();
+        }
+    }
+
+    function submitGuess() {
+        const guess = parseInt(document.getElementById('guess-input').value);
+        if (isNaN(guess) || guess < 1 || guess > maxRange) {
+            showToast(`กรุณากรอกตัวเลขระหว่าง 1-${maxRange}`, 'error');
+            return;
+        }
+
+        if (guessHistory.includes(guess)) {
+            showToast('คุณได้ทายเลขนี้ไปแล้ว!', 'error');
+            return;
+        }
+
+        guessHistory.push(guess);
+        document.getElementById('guess-history').innerHTML = guessHistory.map(num => `<li>${num}</li>`).join('');
+        attemptsLeft--;
+        document.getElementById('attempts-left').textContent = attemptsLeft;
+        document.getElementById('progress-bar').style.width = (attemptsLeft / (maxRange === 200 ? 15 : maxRange === 100 ? 10 : 5) * 100) + '%';
+
+        if (guess === randomNumber) {
+            showToast(`Congrat🏆 คุณทายถูก!🥳 เลขคือ ${randomNumber}`, 'success');
+            document.getElementById('reset-button').classList.remove('hidden');
+        } else if (attemptsLeft <= 0) {
+            showToast(`คุณหมดโอกาสแล้ว!😭 เลขที่ถูกต้องคือ ${randomNumber}`, 'error');
+            document.getElementById('reset-button').classList.remove('hidden');
+        } else {
+            showToast(guess < randomNumber ? 'ตัวเลขนั้นยังต่ำเกินไป!⬇️' : 'ตัวเลขนั้นยังสูงเกินไป!⬆️', 'error');
+        }
+    }
+
+    function resetGame() {
+        randomNumber = Math.floor(Math.random() * maxRange) + 1;
+        guessHistory = [];
+        document.getElementById('guess-history').innerHTML = '';
+        document.getElementById('attempts-left').textContent = attemptsLeft;
+        document.getElementById('progress-bar').style.width = '100%';
+        document.getElementById('guess-input').value = '';
+        document.getElementById('reset-button').classList.add('hidden');
+        showToast('เริ่มเกม!', 'success');
+    }
+
+    function logout() {
+        showToast('ออกจากระบบสำเร็จ', 'success');
+        document.getElementById('game-container').classList.add('hidden');
+        document.getElementById('login-container').classList.remove('hidden');
+    }
+</script>
+
+</body>
+</html>
